@@ -1,3 +1,1 @@
-Mail sending project that I never completely finished.
-
-The plan was setting it up with Auth0 and mailtrap, using a simple sql database and then hosting the frontend and backend on something not github pages related.
+Had some configuration problems in my mailrocket, so I wanted to try something new, so I created this mailapp
