@@ -1,194 +1,51 @@
 <template>
   <div class="email-composer">
-    <div class="composer-header">
-      <h2>Compose New Email</h2>
-    </div>
+    <EmailHeader />
 
-    <form @submit.prevent="sendEmail" class="email-form">
-      <div class="form-group">
-        <label for="to">To</label>
-        <input
-            type="email"
-            id="to"
-            v-model="email.to"
-            placeholder="recipient@example.com"
-            required
-            class="form-input"
-            @focus="handleFocus"
-            @blur="handleBlur"
-        >
-      </div>
+    <form @submit.prevent>
+      <EmailForm :email="email" />
 
-      <div class="form-group">
-        <label for="subject">Subject</label>
-        <input
-            type="text"
-            id="subject"
-            v-model="email.subject"
-            placeholder="Email subject"
-            class="form-input"
-            @focus="handleFocus"
-            @blur="handleBlur"
-        >
-      </div>
+      <EmailPreview
+          :email="email"
+          :has-content="hasContent"
+      />
 
-      <div class="form-group">
-        <label for="message">Message</label>
-        <textarea
-            id="message"
-            v-model="email.message"
-            placeholder="Write your message here..."
-            rows="12"
-            class="form-textarea"
-            @focus="handleFocus"
-            @blur="handleBlur"
-        ></textarea>
-      </div>
-
-      <!-- Email Preview -->
-      <div class="email-preview" v-if="hasContent">
-        <h3>Email Preview</h3>
-        <div class="preview-content">
-          <div class="preview-field">
-            <strong>To:</strong> {{ email.to || 'patrickbroehansenwor' }}
-          </div>
-          <div class="preview-field">
-            <strong>Subject:</strong> {{ email.subject || 'test' }}
-          </div>
-          <div class="preview-field">
-            <strong>Message:</strong>
-            <div class="message-preview">{{ email.message || 'No message content' }}</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Quick Actions -->
-      <div class="quick-actions">
-        <button type="button" class="quick-btn" @click="insertTemplate">
-          📝 Insert Template
-        </button>
-        <button type="button" class="quick-btn" @click="clearForm">
-          🗑️ Clear
-        </button>
-      </div>
-
-      <!-- Action Buttons -->
-      <div class="action-buttons">
-        <button
-            type="button"
-            @click="saveDraft"
-            class="btn btn-secondary"
-            :disabled="!hasContent"
-        >
-          Save Draft
-        </button>
-        <button
-            type="submit"
-            class="btn btn-primary"
-            :disabled="!email.to"
-        >
-          Send Email
-        </button>
-      </div>
+      <EmailActions
+          :email="email"
+          :has-content="hasContent"
+          @send="sendEmail($emit)"
+          @save="saveDraft($emit)"
+          @insert-template="insertTemplate"
+          @clear="clearForm"
+      />
     </form>
   </div>
 </template>
 
-<script>
-export default {
-  name: 'EmailComposer',
-  data() {
-    return {
-      email: {
-        to: '',
-        subject: '',
-        message: ''
-      }
-    }
-  },
-  computed: {
-    hasContent() {
-      return this.email.to || this.email.subject || this.email.message
-    }
-  },
-  methods: {
-    sendEmail() {
-      if (this.email.to) {
-        this.$emit('send-email', { ...this.email })
-        this.resetForm()
-        this.showNotification('Email sent successfully!')
-      }
-    },
-    saveDraft() {
-      if (this.hasContent) {
-        this.$emit('save-draft', { ...this.email })
-        this.showNotification('Draft saved successfully!')
-      }
-    },
-    resetForm() {
-      this.email = {
-        to: '',
-        subject: '',
-        message: ''
-      }
-    },
-    insertTemplate() {
-      this.email.message = 'Dear recipient,\n\nThank you for your email.\n\nBest regards,\n[Your Name]'
-    },
-    clearForm() {
-      this.resetForm()
-      this.showNotification('Form cleared')
-    },
-    showNotification(message) {
-      // Simple notification
-      const notification = document.createElement('div')
-      notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #28a745;
-        color: white;
-        padding: 12px 20px;
-        border-radius: 8px;
-        z-index: 10000;
-        font-weight: 500;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      `
-      notification.textContent = message
-      document.body.appendChild(notification)
+<script setup>
+import EmailHeader from './EmailHeader.vue'
+import EmailForm from './EmailForm.vue'
+import EmailPreview from './EmailPreview.vue'
+import EmailActions from './EmailActions.vue'
 
-      setTimeout(() => {
-        if (document.body.contains(notification)) {
-          document.body.removeChild(notification)
-        }
-      }, 3000)
-    },
-    handleFocus(event) {
-      event.target.classList.add('focused')
-      event.target.classList.remove('blurred')
-    },
-    handleBlur(event) {
-      if (!event.target.value) {
-        event.target.classList.remove('focused')
-        event.target.classList.add('blurred')
-      }
-    }
-  },
-  mounted() {
-    // Tilføj blur klasse til alle input/textarea ved start
-    setTimeout(() => {
-      const inputs = this.$el.querySelectorAll('.form-input, .form-textarea')
-      inputs.forEach(input => {
-        if (!input.value && document.activeElement !== input) {
-          input.classList.add('blurred')
-        }
-      })
-    }, 100)
-  }
-}
+import { useEmailComposer } from '../../composables/useEmailComposer.js'
+
+const {
+  email,
+  hasContent,
+  sendEmail,
+  saveDraft,
+  insertTemplate,
+  clearForm
+} = useEmailComposer()
 </script>
 
-<style scoped>
+
+// NOTE:
+// Styles are intentionally not scoped.
+// In a larger production setup these styles would likely live in a shared layout or design system.
+// Scoped CSS would prevent child components from inheriting required styles.
+<style>
 .email-composer {
   background: white;
   border-radius: 24px;

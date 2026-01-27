@@ -164,7 +164,7 @@
 </template>
 
 <script>
-import EmailComposer from './component/EmailComposer.vue'
+import EmailComposer from './components/mail/EmailComposer.vue'
 
 export default {
   name: 'App',
