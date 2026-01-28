@@ -23,8 +23,24 @@
 export default {
   name: 'EmailPreview',
   props: {
-    email: Object,
-    hasContent: Boolean
+    email: {
+      type: Object,
+      required: true
+    }
+  },
+  computed: {
+    hasContent() {
+      return (
+          this.email.to ||
+          this.email.subject ||
+          this.email.message
+      )
+    }
   }
 }
 </script>
+<style scoped>
+.email-preview {
+  margin: 15px;
+}
+</style>

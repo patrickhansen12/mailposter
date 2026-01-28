@@ -38,6 +38,7 @@ const {
   insertTemplate,
   clearForm
 } = useEmailComposer()
+
 </script>
 
 
@@ -112,6 +113,7 @@ const {
 .form-group {
   display: flex;
   flex-direction: column;
+  //padding: 0 24px;
 }
 
 .form-group label {

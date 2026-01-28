@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="button-container">
     <div class="quick-actions">
       <button class="quick-btn" @click="$emit('insert-template')">
         📝 Insert Template
@@ -39,3 +39,8 @@ export default {
   }
 }
 </script>
+<style scoped>
+.button-container{
+  margin:15px;
+}
+</style>/

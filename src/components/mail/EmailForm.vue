@@ -32,3 +32,8 @@ export default {
   }
 }
 </script>
+<style scoped>
+.email-form-fields{
+  padding: 15px 15px 15px 15px;
+}
+</style>/
