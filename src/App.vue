@@ -70,7 +70,7 @@
                 >
                   <span class="nav-icon">📤</span>
                   <span>Sent</span>
-                  <span class="badge" v-if="sentEmails.length > 0">{{ sentEmails.length }}</span>
+                  <span class="badge" v-if="mailStore.sentEmails.length > 0">{{ mailStore.sentEmails.length }}</span>
                 </button>
                 <button
                     :class="['nav-item', { 'active': currentView === 'drafts' }]"
@@ -102,19 +102,19 @@
               </div>
               <div class="email-list">
                 <div
-                    v-for="email in sentEmails"
+                    v-for="email in mailStore.sentEmails"
                     :key="email.id"
                     class="email-item"
                     @click="viewEmail(email)"
                 >
                   <div class="email-header">
-                    <div class="email-to">{{ email.to }}</div>
-                    <div class="email-time">{{ formatTime(email.timestamp) }}</div>
+                    <div class="email-to"> Reciever: {{ email.recipientEmail }}</div>
+                    <div class="email-time">{{ formatTime(email.sentAt) }}</div>
                   </div>
-                  <div class="email-subject">{{ email.subject || '(No subject)' }}</div>
-                  <div class="email-preview">{{ getMessagePreview(email.message) }}</div>
+                  <div class="email-subject">Subject: {{ email.subject || '(No subject)' }}</div>
+                  <div class="email-preview">{{ getMessagePreview(email.body) }}</div>
                 </div>
-                <div v-if="sentEmails.length === 0" class="empty-state">
+                <div v-if="mailStore.sentEmails.length === 0" class="empty-state">
                   <span class="empty-icon">📤</span>
                   <h3>No sent emails</h3>
                   <p>Your sent emails will appear here</p>
@@ -165,52 +165,59 @@
 
 <script>
 import EmailComposer from './components/mail/EmailComposer.vue'
+import { useAuthStore } from './stores/authStore'
+import { useMailStore } from './stores/mailStore'
 
 export default {
   name: 'App',
-  components: {
-    EmailComposer
-  },
+  components: { EmailComposer },
+
   data() {
     return {
-      isLoggedIn: false,
       isSidebarOpen: false,
       currentView: 'compose',
       loginData: {
         email: '',
         password: ''
       },
-      sentEmails: [
-        {
-          id: 1,
-          to: 'patrickbroehansenwork@hotmail.com',
-          subject: 'test subject',
-          message: 's',
-          timestamp: new Date().toISOString()
-        }
-      ],
       drafts: []
     }
   },
-  mounted() {
-    // Check screen size and auto-open sidebar on desktop
-    this.handleResize()
-    window.addEventListener('resize', this.handleResize)
+
+  computed: {
+    authStore() {
+      return useAuthStore()
+    },
+    isLoggedIn() {
+      return !!this.authStore.userId
+    },
+    mailStore() {
+      return useMailStore()
+    }
   },
-  beforeUnmount() {
-    window.removeEventListener('resize', this.handleResize)
-  },
+
   methods: {
     login() {
       if (this.loginData.email && this.loginData.password) {
-        this.isLoggedIn = true
+        this.authStore.login({
+          id: crypto.randomUUID(),
+          email: this.loginData.email
+        })
+
+        const mailStore = useMailStore()
+        mailStore.fetchSentEmails()
+
+        this.loginData = { email: '', password: '' }
       }
     },
+
     logout() {
-      this.isLoggedIn = false
-      this.loginData = { email: '', password: '' }
+      this.authStore.logout()
       this.currentView = 'compose'
       this.isSidebarOpen = false
+
+      const mailStore = useMailStore()
+      mailStore.clear()
     },
     toggleSidebar() {
       this.isSidebarOpen = !this.isSidebarOpen
@@ -251,14 +258,11 @@ export default {
       }
     },
     viewEmail(email) {
-      alert(`To: ${email.to}\nSubject: ${email.subject}\n\n${email.message}`)
+      alert(`To: ${email.recipientEmail}\nSubject: ${email.subject}\n\n${email.body}`)
     },
     editDraft(draft) {
       this.currentView = 'compose'
-      // In a real app, you'd pass this to the composer component via props/event bus
       setTimeout(() => {
-        // This would be handled by the EmailComposer component
-        console.log('Editing draft:', draft)
       }, 100)
     },
     formatTime(timestamp) {

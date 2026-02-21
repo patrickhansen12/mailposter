@@ -1,4 +1,6 @@
 import { ref, computed } from 'vue'
+import { sendMail } from '../services/mailService'
+import {useMailStore} from "../Stores/mailStore.js";
 
 export function useEmailComposer() {
     const email = ref({
@@ -7,30 +9,36 @@ export function useEmailComposer() {
         message: ''
     })
 
+    const isSending = ref(false)
+
     const hasContent = computed(() =>
-        email.value.to || email.value.subject || email.value.message
+        email.value.to ||
+        email.value.subject ||
+        email.value.message
     )
 
     function resetForm() {
         email.value = { to: '', subject: '', message: '' }
     }
 
+    async function sendEmail() {
+        try {
+            await sendMail(email.value)
+
+            resetForm()
+            showNotification('Email sent successfully!', 'success')
+        } catch (error) {
+            showNotification('Email failed!', 'error')
+        }
+    }
+
+    async function saveDraft() {
+        console.log('Draft saving coming later')
+    }
+
     function insertTemplate() {
         email.value.message =
-            'Dear recipient,\n\nThank you for your email.\n\nBest regards,\n[Your Name]'
-    }
-
-    function sendEmail(emit) {
-        if (!email.value.to) return
-        emit('send-email', { ...email.value })
-        resetForm()
-        showNotification('Email sent successfully!')
-    }
-
-    function saveDraft(emit) {
-        if (!hasContent.value) return
-        emit('save-draft', { ...email.value })
-        showNotification('Draft saved successfully!')
+            'Dear recipient,\n\nThank you for your email.\n\nBest regards,\nPatrick'
     }
 
     function clearForm() {
@@ -38,20 +46,20 @@ export function useEmailComposer() {
         showNotification('Form cleared')
     }
 
-    function showNotification(message) {
+
+    function showNotification(message, type = 'success') {
         const notification = document.createElement('div')
+
         notification.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: #28a745;
-      color: white;
-      padding: 12px 20px;
-      border-radius: 8px;
-      z-index: 10000;
-      font-weight: 500;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'error' ? '#dc3545' : '#28a745'};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        z-index: 10000;
+        `
         notification.textContent = message
         document.body.appendChild(notification)
 
@@ -67,6 +75,7 @@ export function useEmailComposer() {
         sendEmail,
         saveDraft,
         insertTemplate,
-        clearForm
+        clearForm,
+        isSending
     }
 }

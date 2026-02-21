@@ -13,8 +13,8 @@
       <EmailActions
           :email="email"
           :has-content="hasContent"
-          @send="sendEmail($emit)"
-          @save="saveDraft($emit)"
+          @send="sendEmail"
+          @save="saveDraft"
           @insert-template="insertTemplate"
           @clear="clearForm"
       />
