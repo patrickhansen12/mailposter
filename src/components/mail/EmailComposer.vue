@@ -3,7 +3,7 @@
     <EmailHeader />
 
     <form @submit.prevent>
-      <EmailForm :email="email" />
+      <EmailForm v-model="email" />
 
       <EmailPreview
           :email="email"
@@ -12,7 +12,8 @@
 
       <EmailActions
           :email="email"
-          :has-content="hasContent"
+          :hasContent=canSaveDraft
+          :canSendEmail=canSend
           @send="sendEmail"
           @save="saveDraft"
           @insert-template="insertTemplate"
@@ -27,8 +28,10 @@ import EmailHeader from './EmailHeader.vue'
 import EmailForm from './EmailForm.vue'
 import EmailPreview from './EmailPreview.vue'
 import EmailActions from './EmailActions.vue'
-
+import { useDraftStore } from '../../stores/draftStore'
+import {useAuthStore} from "../../stores/authStore.js";
 import { useEmailComposer } from '../../composables/useEmailComposer.js'
+import {computed, watch} from "vue";
 
 const {
   email,
@@ -38,6 +41,62 @@ const {
   insertTemplate,
   clearForm
 } = useEmailComposer()
+
+const draftStore = useDraftStore()
+const authStore = useAuthStore()
+
+const isValidEmail = (email) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+
+const canSend = computed(() => {
+  return (
+      isValidEmail(email.value.to) &&
+      email.value.subject.trim() !== '' &&
+      email.value.message.trim() !== ''
+  )
+})
+//I have allowed to save non emails in drafts, as the scenario I am aiming for, is where a person can save a ton of emails For sending later
+//Example I have to send a mail to HR Mads from team Esbjerg, I dont have his email right but I have the message
+//I will just save it as a draft so I wont forget it later.
+const canSaveDraft = computed(() => {
+  return (
+      email.value.to  !== '' ||
+      email.value.subject.trim() !== '' ||
+      email.value.message.trim() !== ''
+  )
+})
+
+
+watch(
+    () => draftStore.currentDraft,
+    (draft) => {
+      if (draft) {
+        email.value = {
+          to: draft.recipientEmail,
+          subject: draft.subject,
+          message: draft.body
+        }
+      }
+    },
+    { immediate: true }
+)
+
+watch(
+    () => authStore.isAuthenticated,
+    (isAuth) => {
+      if (!isAuth) {
+        resetForm()
+      }
+    }
+)
+
+function resetForm() {
+  email.value = {
+    to: '',
+    subject: '',
+    message: ''
+  }
+}
 
 </script>
 
@@ -113,7 +172,6 @@ const {
 .form-group {
   display: flex;
   flex-direction: column;
-  //padding: 0 24px;
 }
 
 .form-group label {

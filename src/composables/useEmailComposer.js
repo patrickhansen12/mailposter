@@ -1,8 +1,13 @@
 import { ref, computed } from 'vue'
 import { sendMail } from '../services/mailService'
-import {useMailStore} from "../Stores/mailStore.js";
+import {useDraftStore} from "../stores/draftStore.js";
+import { useAuthStore } from '../stores/authStore'
+
+
 
 export function useEmailComposer() {
+    const draftStore = useDraftStore();
+    const authStore = useAuthStore();
     const email = ref({
         to: '',
         subject: '',
@@ -33,7 +38,22 @@ export function useEmailComposer() {
     }
 
     async function saveDraft() {
-        console.log('Draft saving coming later')
+        if (!hasContent.value) return
+
+        if (draftStore.currentDraft) {
+            await draftStore.editDraft(draftStore.currentDraft.id, {
+                ...email.value,
+                senderEmail: authStore.userEmail
+            })
+        } else {
+            await draftStore.addDraft({
+                ...email.value,
+                senderEmail: authStore.userEmail
+            })
+        }
+
+        draftStore.clearCurrentDraft()
+        resetForm()
     }
 
     function insertTemplate() {

@@ -78,7 +78,9 @@
                 >
                   <span class="nav-icon">📁</span>
                   <span>Drafts</span>
-                  <span class="badge" v-if="drafts.length > 0">{{ drafts.length }}</span>
+                  <div v-if="draftStore.drafts.length > 0">
+                  <span class="badge" v-if="draftStore.drafts.length > 0">{{ draftStore.drafts.length ?? 0 }}</span>
+                  </div>
                 </button>
               </nav>
             </div>
@@ -123,33 +125,61 @@
             </div>
 
             <!-- Drafts View -->
+            <!-- Drafts View -->
             <div v-if="currentView === 'drafts'" class="view-container">
               <div class="view-header">
                 <h2>Drafts</h2>
                 <p class="view-subtitle">Your saved drafts</p>
               </div>
+
               <div class="email-list">
                 <div
-                    v-for="draft in drafts"
+                    v-for="draft in draftStore.drafts"
                     :key="draft.id"
                     class="email-item draft-item"
                     @click="editDraft(draft)"
                 >
                   <div class="email-header">
-                    <div class="email-to">{{ draft.to || 'No recipient' }}</div>
-                    <div class="email-time">Draft</div>
+                    <div class="email-to">
+                      {{ draft.recipientEmail || 'No recipient' }}
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap:12px;">
+                      <div class="email-time">
+                        {{ formatTime(draft.updatedAt || draft.createdAt) }}
+                      </div>
+
+                      <button
+                          class="delete-draft-btn"
+                          @click.stop="confirmDeleteDraft(draft)"
+                          title="Delete draft"
+                      >
+                        🗑
+                      </button>
+                    </div>
                   </div>
-                  <div class="email-subject">{{ draft.subject || '(No subject)' }}</div>
-                  <div class="email-preview">{{ getMessagePreview(draft.message) }}</div>
+
+                  <div class="email-subject">
+                    {{ draft.subject || '(No subject)' }}
+                  </div>
+
+                  <div class="email-preview">
+                    {{ getMessagePreview(draft.body) }}
+                  </div>
+
+                  <div class="draft-info">
+                    Created: {{ formatTime(draft.createdAt) }} |
+                    Updated: {{ formatTime(draft.updatedAt) }}
+                  </div>
                 </div>
-                <div v-if="drafts.length === 0" class="empty-state">
+
+                <div v-if="draftStore.drafts.length === 0" class="empty-state">
                   <span class="empty-icon">📁</span>
                   <h3>No drafts</h3>
                   <p>Your saved drafts will appear here</p>
                 </div>
               </div>
             </div>
-          </div>
         </div>
 
         <!-- Mobile Overlay -->
@@ -161,12 +191,14 @@
       </div>
     </div>
   </div>
+  </div>
 </template>
 
 <script>
 import EmailComposer from './components/mail/EmailComposer.vue'
 import { useAuthStore } from './stores/authStore'
 import { useMailStore } from './stores/mailStore'
+import { useDraftStore } from './stores/draftStore'
 
 export default {
   name: 'App',
@@ -180,7 +212,6 @@ export default {
         email: '',
         password: ''
       },
-      drafts: []
     }
   },
 
@@ -193,8 +224,12 @@ export default {
     },
     mailStore() {
       return useMailStore()
+    },
+    draftStore() {
+      return useDraftStore()
     }
   },
+
 
   methods: {
     login() {
@@ -203,21 +238,37 @@ export default {
           id: crypto.randomUUID(),
           email: this.loginData.email
         })
-
+        //gets the sent mails
         const mailStore = useMailStore()
         mailStore.fetchSentEmails()
+
+        //gets all the logged in users drafts
+        const draftStore = useDraftStore()
+        draftStore.loadDrafts(this.loginData.email)
 
         this.loginData = { email: '', password: '' }
       }
     },
+    async confirmDeleteDraft(draft) {
+      const recipient = draft.recipientEmail || 'No recipient'
+      const subject = draft.subject || '(No subject)'
 
+      const confirmed = confirm(
+          `Are you sure you want to delete this draft?\n\nTo: ${recipient}\nSubject: ${subject}`
+      )
+
+      if (!confirmed) return
+
+      await this.draftStore.removeDraft(draft.id)
+    },
     logout() {
       this.authStore.logout()
       this.currentView = 'compose'
       this.isSidebarOpen = false
-
+      const draftStore = useDraftStore()
       const mailStore = useMailStore()
-      mailStore.clear()
+      draftStore.$reset()
+      mailStore.$reset()
     },
     toggleSidebar() {
       this.isSidebarOpen = !this.isSidebarOpen
@@ -261,9 +312,9 @@ export default {
       alert(`To: ${email.recipientEmail}\nSubject: ${email.subject}\n\n${email.body}`)
     },
     editDraft(draft) {
+      const draftStore = useDraftStore()
+      draftStore.setCurrentDraft(draft)
       this.currentView = 'compose'
-      setTimeout(() => {
-      }, 100)
     },
     formatTime(timestamp) {
       try {

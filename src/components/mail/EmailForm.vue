@@ -2,18 +2,29 @@
   <div class="email-form-fields">
     <div class="form-group">
       <label>To</label>
-      <input type="email" v-model="email.to" class="form-input" />
+      <input
+          type="email"
+          :value="modelValue.to"
+          @input="updateField('to', $event.target.value)"
+          class="form-input"
+      />
     </div>
 
     <div class="form-group">
       <label>Subject</label>
-      <input type="text" v-model="email.subject" class="form-input" />
+      <input
+          type="text"
+          :value="modelValue.subject"
+          @input="updateField('subject', $event.target.value)"
+          class="form-input"
+      />
     </div>
 
     <div class="form-group">
       <label>Message</label>
       <textarea
-          v-model="email.message"
+          :value="modelValue.message"
+          @input="updateField('message', $event.target.value)"
           rows="12"
           class="form-textarea"
       />
@@ -24,10 +35,22 @@
 <script>
 export default {
   name: 'EmailForm',
+
   props: {
-    email: {
+    modelValue: {
       type: Object,
       required: true
+    }
+  },
+
+  emits: ['update:modelValue'],
+
+  methods: {
+    updateField(field, value) {
+      this.$emit('update:modelValue', {
+        ...this.modelValue,
+        [field]: value
+      })
     }
   }
 }

@@ -2,7 +2,7 @@
   <div class="button-container">
     <div class="quick-actions">
       <button class="quick-btn" @click="$emit('insert-template')">
-        📝 Insert Template
+        📝 Use Template
       </button>
 
       <button class="quick-btn" @click="$emit('clear')">
@@ -21,7 +21,7 @@
 
       <button
           class="btn btn-primary"
-          :disabled="!email.to"
+          :disabled="!canSendEmail"
           @click="$emit('send')"
       >
         Send Email
@@ -34,8 +34,18 @@
 export default {
   name: 'EmailActions',
   props: {
-    email: Object,
-    hasContent: Boolean
+    email: {
+      type: Object,
+      required: true
+    },
+    hasContent: {
+      type: Boolean,
+      required: true
+    },
+    canSendEmail: {
+      type: Boolean,
+      required: true
+    }
   }
 }
 </script>

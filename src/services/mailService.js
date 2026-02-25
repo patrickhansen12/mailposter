@@ -1,4 +1,4 @@
-import {useMailStore} from "../Stores/mailStore.js";
+import {useMailStore} from "../stores/mailStore.js";
 
 const BASE_URL = 'http://localhost:5170/api/mail'
 
