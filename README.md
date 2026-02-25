@@ -42,6 +42,7 @@ This frontend requires the **MailPosterAPI** backend to be running locally.
 Default API base URL: https://localhost:5001/api
 
 Make sure MailPosterAPI is running before starting this project.
+https://github.com/patrickhansen12/MailPosterAPI
 
 ---
 
