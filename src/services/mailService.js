@@ -1,6 +1,6 @@
 import {useMailStore} from "../stores/mailStore.js";
 
-const BASE_URL = 'http://localhost:5170/api/mail'
+const BASE_URL = 'https://mailposterapi-serverside.onrender.com/api/mail'
 
 
 import { useAuthStore } from '../stores/authStore'
@@ -8,7 +8,7 @@ import { useAuthStore } from '../stores/authStore'
 export async function sendMail(payload) {
     const authStore = useAuthStore()
     const mailStore = useMailStore()
-    const response = await fetch('http://localhost:5170/api/mail', {
+    const response = await fetch(`${BASE_URL}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

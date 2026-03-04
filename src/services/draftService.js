@@ -1,11 +1,11 @@
 import { useAuthStore } from '../stores/authStore'
 
-const BASE_URL = 'http://localhost:5170/api/draft'
+const BASE_URL = 'https://mailposterapi-serverside.onrender.com/api/draft'
 
 export async function getDrafts() {
     const authStore = useAuthStore()
 
-    const response = await fetch('http://localhost:5170/api/draft', {
+    const response = await fetch(`${BASE_URL}`, {
         headers: {
             'X-User-Email': authStore.email
         }

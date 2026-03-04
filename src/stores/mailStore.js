@@ -13,7 +13,7 @@ export const useMailStore = defineStore('mail', {
             if (!authStore.email) return
 
             const response = await fetch(
-                `http://localhost:5170/api/mail?userEmail=${authStore.email}`
+                `https://mailposterapi-serverside.onrender.com/api/mail?userEmail=${authStore.email}`
             )
 
             if (!response.ok) {

@@ -1,6 +1,12 @@
 <template>
   <div id="app">
     <div class="app-container">
+      <!-- Loading Overlay (Being shown when the backend is starting up) -->
+      <div v-if="isLoading" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p class="loading-text">Waking up the server..</p>
+      </div>
+
       <!-- Login Screen -->
       <div v-if="!isLoggedIn" class="login-screen">
         <div class="login-container">
@@ -8,7 +14,7 @@
             <span class="logo-icon">✉️</span>
             <h1>MailApp</h1>
           </div>
-          <p class="login-subtitle">Please login to start sending emails</p>
+          <p class="login-subtitle">{{ welcomeMessage }}</p>
           <form @submit.prevent="login" class="login-form">
             <div class="form-group">
               <input
@@ -79,7 +85,7 @@
                   <span class="nav-icon">📁</span>
                   <span>Drafts</span>
                   <div v-if="draftStore.drafts.length > 0">
-                  <span class="badge" v-if="draftStore.drafts.length > 0">{{ draftStore.drafts.length ?? 0 }}</span>
+                    <span class="badge" v-if="draftStore.drafts.length > 0">{{ draftStore.drafts.length ?? 0 }}</span>
                   </div>
                 </button>
               </nav>
@@ -110,7 +116,7 @@
                     @click="viewEmail(email)"
                 >
                   <div class="email-header">
-                    <div class="email-to"> Reciever: {{ email.recipientEmail }}</div>
+                    <div class="email-to">Receiver: {{ email.recipientEmail }}</div>
                     <div class="email-time">{{ formatTime(email.sentAt) }}</div>
                   </div>
                   <div class="email-subject">Subject: {{ email.subject || '(No subject)' }}</div>
@@ -124,7 +130,6 @@
               </div>
             </div>
 
-            <!-- Drafts View -->
             <!-- Drafts View -->
             <div v-if="currentView === 'drafts'" class="view-container">
               <div class="view-header">
@@ -180,17 +185,24 @@
                 </div>
               </div>
             </div>
-        </div>
+          </div>
 
-        <!-- Mobile Overlay -->
-        <div
-            v-if="isSidebarOpen"
-            class="sidebar-overlay"
-            @click="toggleSidebar"
-        ></div>
+          <!-- Mobile Overlay -->
+          <div
+              v-if="isSidebarOpen"
+              class="sidebar-overlay"
+              @click="toggleSidebar"
+          ></div>
+        </div>
+      </div>
+
+      <!-- Toast Container (for notifications) -->
+      <div v-if="toast.show" :class="['toast-container', toast.type]">
+        <div class="toast">
+          {{ toast.message }}
+        </div>
       </div>
     </div>
-  </div>
   </div>
 </template>
 
@@ -212,6 +224,13 @@ export default {
         email: '',
         password: ''
       },
+      isLoading: false,
+      welcomeMessage: 'Please login to start sending emails',
+      toast: {
+        show: false,
+        message: '',
+        type: 'success'
+      }
     }
   },
 
@@ -230,25 +249,69 @@ export default {
     }
   },
 
+  mounted() {
+    this.handleResize()
+    window.addEventListener('resize', this.handleResize)
+
+    // PING BACKEND WHEN THE APP STARTS (awakes Render from sleep mode)
+    this.pingBackend()
+
+    // Set greeting message
+    setTimeout(() => {
+      this.welcomeMessage = this.isLoggedIn ? 'Welcome back!' : 'Please login to start sending emails'
+    }, 500)
+  },
+
+  beforeUnmount() {
+    window.removeEventListener('resize', this.handleResize)
+  },
 
   methods: {
+    async pingBackend() {
+      this.isLoading = true
+      try {
+        const baseUrl = import.meta.env.VITE_API_URL || 'https://mailposterapi-serverside.onrender.com'
+
+        // Try pinging the backend
+        const response = await fetch(`${baseUrl}/health`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        })
+
+        if (response.ok) {
+          this.showToast('Backend is ready', 'success')
+        }
+      } catch (error) {
+        console.log('⏳ waking up backend...')
+        // Everything is okay, as it is awaken
+      } finally {
+        setTimeout(() => {
+          this.isLoading = false
+        }, 500) //
+      }
+    },
+
     login() {
       if (this.loginData.email && this.loginData.password) {
         this.authStore.login({
           id: crypto.randomUUID(),
           email: this.loginData.email
         })
-        //gets the sent mails
+
+        // Get sent mails
         const mailStore = useMailStore()
         mailStore.fetchSentEmails()
 
-        //gets all the logged in users drafts
+        // Get all drafts for the logged in user
         const draftStore = useDraftStore()
         draftStore.loadDrafts(this.loginData.email)
 
+
         this.loginData = { email: '', password: '' }
+        this.showToast(`Welcome ${this.authStore.email}!`, 'success')
       }
     },
+
     async confirmDeleteDraft(draft) {
       const recipient = draft.recipientEmail || 'No recipient'
       const subject = draft.subject || '(No subject)'
@@ -260,7 +323,9 @@ export default {
       if (!confirmed) return
 
       await this.draftStore.removeDraft(draft.id)
+      this.showToast('Draft deleted', 'success')
     },
+
     logout() {
       this.authStore.logout()
       this.currentView = 'compose'
@@ -269,10 +334,13 @@ export default {
       const mailStore = useMailStore()
       draftStore.$reset()
       mailStore.$reset()
+      this.showToast('logged out', 'success')
     },
+
     toggleSidebar() {
       this.isSidebarOpen = !this.isSidebarOpen
     },
+
     setView(view) {
       this.currentView = view
       // On mobile, close sidebar after selecting view
@@ -280,6 +348,7 @@ export default {
         this.isSidebarOpen = false
       }
     },
+
     handleResize() {
       // Auto-show sidebar on desktop, hide on mobile
       if (window.innerWidth >= 768) {
@@ -288,13 +357,16 @@ export default {
         this.isSidebarOpen = false
       }
     },
+
     sendEmail(emailData) {
       this.sentEmails.unshift({
         ...emailData,
         id: Date.now(),
         timestamp: new Date().toISOString()
       })
+      this.showToast('Email sendt!', 'success')
     },
+
     saveDraft(draftData) {
       if (draftData.to || draftData.subject || draftData.message) {
         // Remove existing draft with same content to avoid duplicates
@@ -306,16 +378,20 @@ export default {
           ...draftData,
           id: Date.now()
         })
+        this.showToast('Draft saved', 'success')
       }
     },
+
     viewEmail(email) {
       alert(`To: ${email.recipientEmail}\nSubject: ${email.subject}\n\n${email.body}`)
     },
+
     editDraft(draft) {
       const draftStore = useDraftStore()
       draftStore.setCurrentDraft(draft)
       this.currentView = 'compose'
     },
+
     formatTime(timestamp) {
       try {
         const date = new Date(timestamp)
@@ -333,9 +409,21 @@ export default {
         return 'Recent'
       }
     },
+
     getMessagePreview(message) {
       if (!message) return 'No message content'
       return message.length > 60 ? message.substring(0, 60) + '...' : message
+    },
+
+    showToast(message, type = 'success') {
+      this.toast = {
+        show: true,
+        message,
+        type
+      }
+      setTimeout(() => {
+        this.toast.show = false
+      }, 3000)
     }
   }
 }
@@ -345,6 +433,86 @@ export default {
 /* App Container */
 .app-container {
   min-height: 100vh;
+  position: relative;
+}
+
+/* Loading Overlay */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(5px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.3s ease;
+}
+
+.loading-spinner {
+  width: 60px;
+  height: 60px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+.loading-text {
+  color: #333;
+  font-size: 1.2rem;
+  font-weight: 500;
+  animation: pulse 1.5s ease infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Toast Container */
+.toast-container {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  z-index: 9998;
+  animation: slideIn 0.3s ease;
+}
+
+.toast {
+  background: white;
+  padding: 16px 24px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  font-weight: 500;
+  border-left: 4px solid;
+}
+
+.toast-container.success .toast {
+  border-left-color: #28a745;
+  background: #f0fff4;
+  color: #28a745;
+}
+
+.toast-container.error .toast {
+  border-left-color: #dc3545;
+  background: #fff5f5;
+  color: #dc3545;
 }
 
 /* Login Screen */
@@ -359,7 +527,7 @@ export default {
 
 .login-container {
   background: white;
-  padding: 50px 40px;
+  padding: 60px 40px;
   border-radius: 24px;
   box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
   text-align: center;
@@ -387,7 +555,7 @@ export default {
 
 .login-subtitle {
   color: #666;
-  margin-bottom: 35px;
+  margin-bottom: 40px;
   font-size: 1.2rem;
 }
 
@@ -397,13 +565,26 @@ export default {
   gap: 24px;
 }
 
+.form-group {
+  margin-bottom: 0;
+  width: 100%;
+
+  label{
+    margin-top: 10px;
+  }
+}
+
+.form-group:last-of-type {
+  margin-bottom: 8px;
+}
+
 .form-input {
   width: 100%;
   padding: 18px;
   border: 2px solid #e1e5e9;
   border-radius: 14px;
   font-size: 17px;
-  transition: all 0.3s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   background: white;
   color: #333;
 }
@@ -424,8 +605,8 @@ export default {
   font-size: 17px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s;
-  margin-top: 10px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-top: 16px;
 }
 
 .login-btn:hover {
@@ -433,15 +614,19 @@ export default {
   box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
 }
 
-.demo-info {
-  margin-top: 25px;
+.login-btn:active {
+  transform: scale(0.98);
+}
+
+.demo-credentials {
+  margin-top: 30px;  /* Øget margin */
   padding: 15px;
   background: #f8f9fa;
   border-radius: 10px;
   border: 1px solid #e1e5e9;
 }
 
-.demo-info p {
+.demo-credentials p {
   font-size: 0.9rem;
   color: #666;
   margin: 0;
@@ -480,7 +665,7 @@ export default {
 }
 
 .menu-btn {
-  display: none; /* Skjult på desktop */
+  display: none; /* Hidden on desktop */
   background: none;
   border: none;
   font-size: 1.4rem;
@@ -517,6 +702,10 @@ export default {
   transform: translateY(-2px);
 }
 
+.logout-btn:active {
+  transform: scale(0.98);
+}
+
 /* Main Content - DESKTOP FIRST */
 .main-content {
   flex: 1;
@@ -527,13 +716,14 @@ export default {
   position: relative;
 }
 
-/* Sidebar - ALTID synlig på desktop */
+/* Sidebar */
 .sidebar {
   width: 280px;
   background: white;
   border-right: 1px solid #e1e5e9;
   padding: 40px 0;
   flex-shrink: 0;
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar-content {
@@ -558,7 +748,7 @@ export default {
   text-align: left;
   font-size: 1.1rem;
   color: #666;
-  transition: all 0.3s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   font-weight: 500;
 }
@@ -576,18 +766,23 @@ export default {
   box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
 }
 
+.nav-item:active {
+  transform: scale(0.98);
+}
+
 .nav-icon {
   font-size: 1.4rem;
 }
 
 .badge {
-  background: #dc3545;
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
   color: white;
   border-radius: 12px;
   padding: 5px 12px;
   font-size: 0.85rem;
   font-weight: 600;
   margin-left: auto;
+  box-shadow: 0 2px 5px rgba(220, 53, 69, 0.3);
 }
 
 /* Content Area */
@@ -634,8 +829,26 @@ export default {
   border-radius: 18px;
   border: 1px solid #e1e5e9;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.email-item::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.email-item:hover::after {
+  opacity: 1;
 }
 
 .email-item:hover {
@@ -680,13 +893,13 @@ export default {
 }
 
 /* Draft specific styling */
-.email-item.draft {
+.email-item.draft-item {
   border-left: 5px solid #ffc107;
   background: #fffbf0;
   position: relative;
 }
 
-.email-item.draft:hover {
+.email-item.draft-item:hover {
   background: #fff8e1;
 }
 
@@ -701,8 +914,8 @@ export default {
   border: none;
   color: #dc3545;
   cursor: pointer;
-  padding: 6px 10px;
-  border-radius: 6px;
+  padding: 8px 12px;  /* big touch target */
+  border-radius: 8px;
   font-size: 1rem;
   transition: all 0.2s;
 }
@@ -763,7 +976,7 @@ export default {
   line-height: 1.6;
 }
 
-/* MOBILE STYLES - Kun aktiv på mobile */
+/* MOBILE STYLES */
 @media (max-width: 1024px) {
   .header-content,
   .main-content {
@@ -798,12 +1011,12 @@ export default {
     padding: 0 10px;
   }
 
-  /* Vis menu knap på mobile */
+  /* Shows menu button */
   .menu-btn {
     display: block;
   }
 
-  /* Sidebar som drawer på mobile */
+  /* Sidebar as shelves for mobile */
   .sidebar {
     position: fixed;
     top: 0;
@@ -811,7 +1024,7 @@ export default {
     width: 300px;
     height: 100vh;
     z-index: 1000;
-    transition: left 0.3s ease;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     padding-top: 80px;
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
   }
@@ -837,12 +1050,34 @@ export default {
     font-size: 1rem;
   }
 
+  .email-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  .email-time {
+    font-size: 0.8rem;
+    color: #999;
+  }
+
   .empty-state {
     padding: 50px 20px;
   }
 
   .empty-icon {
     font-size: 3rem;
+  }
+
+  .toast-container {
+    bottom: 20px;
+    right: 20px;
+    left: 20px;
+  }
+
+  .toast {
+    width: 100%;
+    text-align: center;
   }
 }
 
@@ -876,15 +1111,6 @@ export default {
     padding: 18px;
   }
 
-  .email-header {
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .email-time {
-    align-self: flex-start;
-  }
-
   .view-header h2 {
     font-size: 1.6rem;
   }
@@ -902,7 +1128,7 @@ export default {
   }
 }
 
-/* Sidebar Overlay - Kun på mobile */
+/* Sidebar Overlay - only on mobile */
 .sidebar-overlay {
   display: none;
   position: fixed;
@@ -940,12 +1166,12 @@ export default {
     color: #e1e5e9;
   }
 
-  .demo-info {
+  .demo-credentials {
     background: #2d3748;
     border-color: #4a5568;
   }
 
-  .demo-info p {
+  .demo-credentials p {
     color: #a0aec0;
   }
 
@@ -989,12 +1215,12 @@ export default {
     color: #a0aec0;
   }
 
-  .email-item.draft {
+  .email-item.draft-item {
     background: #3d2d1a;
     border-left-color: #ffc107;
   }
 
-  .email-item.draft:hover {
+  .email-item.draft-item:hover {
     background: #4a381f;
   }
 
@@ -1010,6 +1236,29 @@ export default {
 
   .empty-state h3 {
     color: #e1e5e9;
+  }
+
+  .loading-overlay {
+    background: rgba(0, 0, 0, 0.9);
+  }
+
+  .loading-text {
+    color: #e1e5e9;
+  }
+
+  .toast {
+    background: #2d2d2d;
+    color: #e1e5e9;
+  }
+
+  .toast-container.success .toast {
+    background: #1a3a1a;
+    color: #4caf50;
+  }
+
+  .toast-container.error .toast {
+    background: #3a1a1a;
+    color: #ff6b6b;
   }
 }
 </style>
